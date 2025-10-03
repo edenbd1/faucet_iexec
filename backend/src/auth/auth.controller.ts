@@ -26,4 +26,9 @@ export class AuthController {
       res.status(500).json({ error: error.message });
     }
   }
+
+  @Get('users')
+  async getAllUsers() {
+    return this.authService.getAllUsers();
+  }
 }

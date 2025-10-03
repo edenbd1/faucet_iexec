@@ -9,6 +9,7 @@ dist/
 
 # User data
 users.txt
+migrate-users-simple.js
 
 # Logs
 *.log

@@ -1,15 +1,16 @@
 import { Injectable, BadRequestException, InternalServerErrorException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
-import * as fs from 'fs';
-import * as path from 'path';
 
 export interface GitHubUser {
   id: number;
   login: string;
   email: string;
-  timestamp: string;
+  avatar_url: string;
 }
+
+// Temporary in-memory storage
+const users: GitHubUser[] = [];
 
 @Injectable()
 export class AuthService {
@@ -81,10 +82,10 @@ export class AuthService {
         id: userData.id,
         login: userData.login,
         email: primaryEmail,
-        timestamp: new Date().toISOString(),
+        avatar_url: userData.avatar_url,
       };
 
-      // Save user to users.txt
+      // Save user to memory
       await this.saveUser(user);
 
       console.log('User connected:', user);
@@ -98,13 +99,35 @@ export class AuthService {
   }
 
   private async saveUser(user: GitHubUser): Promise<void> {
-    const usersFilePath = path.join(process.cwd(), 'users.txt');
-    const userLine = JSON.stringify(user) + '\n';
-    
-    fs.appendFileSync(usersFilePath, userLine);
+    try {
+      // Check if user already exists
+      const existingUserIndex = users.findIndex(u => u.id === user.id);
+      
+      if (existingUserIndex !== -1) {
+        // Update existing user
+        users[existingUserIndex] = user;
+        console.log('User updated in memory:', user.login);
+      } else {
+        // Create new user
+        users.push(user);
+        console.log('New user saved to memory:', user.login);
+      }
+    } catch (error) {
+      console.error('Error saving user to memory:', error);
+      throw new InternalServerErrorException('Failed to save user');
+    }
+  }
+
+  async getAllUsers(): Promise<GitHubUser[]> {
+    try {
+      return users;
+    } catch (error) {
+      console.error('Error fetching users from memory:', error);
+      throw new InternalServerErrorException('Failed to fetch users');
+    }
   }
 
   getHealthStatus(): { status: string; message: string } {
-    return { status: 'OK', message: 'OAuth server running' };
+    return { status: 'OK', message: 'OAuth server running (memory storage)' };
   }
 }
