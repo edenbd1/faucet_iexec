@@ -177,3 +177,19 @@ h1 {
   background: #9ca3af;
   cursor: not-allowed;
 }
+
+.claim-info {
+  margin-top: 16px;
+  padding: 12px;
+  background: #e0f2fe;
+  border: 1px solid #b3e5fc;
+  border-radius: 6px;
+  text-align: center;
+}
+
+.claim-info p {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #0277bd;
+  font-weight: 500;
+}

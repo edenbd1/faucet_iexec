@@ -1,4 +1,4 @@
-import { Controller, Get, Query, Res } from '@nestjs/common';
+import { Controller, Get, Post, Body, Query, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import { AuthService, GitHubUser } from './auth.service';
 
@@ -30,5 +30,10 @@ export class AuthController {
   @Get('users')
   async getAllUsers() {
     return this.authService.getAllUsers();
+  }
+
+  @Post('claim')
+  async claimTokens(@Body() body: { ethAddress: string; userId?: number }) {
+    return this.authService.claimTokens(body.ethAddress, body.userId);
   }
 }

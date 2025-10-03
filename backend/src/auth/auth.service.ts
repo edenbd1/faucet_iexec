@@ -1,6 +1,9 @@
 import { Injectable, BadRequestException, InternalServerErrorException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
 import axios from 'axios';
+import { User, UserDocument } from '../schemas/user.schema';
 
 export interface GitHubUser {
   id: number;
@@ -9,15 +12,15 @@ export interface GitHubUser {
   avatar_url: string;
 }
 
-// Temporary in-memory storage
-const users: GitHubUser[] = [];
-
 @Injectable()
 export class AuthService {
   private readonly githubClientId: string;
   private readonly githubClientSecret: string;
 
-  constructor(private configService: ConfigService) {
+  constructor(
+    private configService: ConfigService,
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
+  ) {
     this.githubClientId = this.configService.get<string>('GITHUB_CLIENT_ID') || '';
     this.githubClientSecret = this.configService.get<string>('GITHUB_CLIENT_SECRET') || '';
 
@@ -101,33 +104,84 @@ export class AuthService {
   private async saveUser(user: GitHubUser): Promise<void> {
     try {
       // Check if user already exists
-      const existingUserIndex = users.findIndex(u => u.id === user.id);
-      
-      if (existingUserIndex !== -1) {
+      const existingUser = await this.userModel.findOne({ githubId: user.id });
+
+      if (existingUser) {
         // Update existing user
-        users[existingUserIndex] = user;
-        console.log('User updated in memory:', user.login);
+        await this.userModel.updateOne(
+          { githubId: user.id },
+          {
+            login: user.login,
+            email: user.email,
+            avatar_url: user.avatar_url,
+          }
+        );
+        console.log('User updated in MongoDB:', user.login);
       } else {
         // Create new user
-        users.push(user);
-        console.log('New user saved to memory:', user.login);
+        const newUser = new this.userModel({
+          githubId: user.id,
+          login: user.login,
+          email: user.email,
+          avatar_url: user.avatar_url,
+        });
+        await newUser.save();
+        console.log('New user saved to MongoDB:', user.login);
       }
     } catch (error) {
-      console.error('Error saving user to memory:', error);
+      console.error('Error saving user to MongoDB:', error);
       throw new InternalServerErrorException('Failed to save user');
     }
   }
 
-  async getAllUsers(): Promise<GitHubUser[]> {
+  async getAllUsers(): Promise<User[]> {
     try {
-      return users;
+      return await this.userModel.find().exec();
     } catch (error) {
-      console.error('Error fetching users from memory:', error);
+      console.error('Error fetching users from MongoDB:', error);
       throw new InternalServerErrorException('Failed to fetch users');
     }
   }
 
+  async claimTokens(ethAddress: string, userId?: number): Promise<{ success: boolean; message: string }> {
+    if (!ethAddress.trim()) {
+      throw new BadRequestException('Ethereum address is required');
+    }
+
+    // Validate Ethereum address format
+    if (!/^0x[a-fA-F0-9]{40}$/.test(ethAddress.trim())) {
+      throw new BadRequestException('Invalid Ethereum address format');
+    }
+
+    try {
+      const cleanAddress = ethAddress.trim();
+
+      if (userId) {
+        // Update user's Ethereum address and last claimed timestamp
+        await this.userModel.updateOne(
+          { githubId: userId },
+          {
+            eth_address: cleanAddress,
+            last_claimed: new Date(),
+          }
+        );
+      }
+
+      // Here you would implement the actual token claiming logic
+      // For now, just simulate success
+      console.log(`Tokens claimed for address: ${cleanAddress}`);
+
+      return {
+        success: true,
+        message: 'Tokens claimed successfully'
+      };
+    } catch (error) {
+      console.error('Error claiming tokens:', error);
+      throw new InternalServerErrorException('Failed to claim tokens');
+    }
+  }
+
   getHealthStatus(): { status: string; message: string } {
-    return { status: 'OK', message: 'OAuth server running (memory storage)' };
+    return { status: 'OK', message: 'OAuth server running with MongoDB' };
   }
 }

@@ -6,6 +6,8 @@ interface User {
   login: string;
   email: string;
   avatar_url?: string;
+  eth_address?: string;
+  last_claimed?: string;
 }
 
 function App() {
@@ -18,12 +20,16 @@ function App() {
     // Check if user is returning from OAuth with data
     const urlParams = new URLSearchParams(window.location.search);
     const userParam = urlParams.get('user');
-    
+
     if (userParam) {
       try {
         const userData = JSON.parse(decodeURIComponent(userParam));
         setUser(userData);
-        
+        // Pre-fill Ethereum address if user has one saved
+        if (userData.eth_address) {
+          setEthAddress(userData.eth_address);
+        }
+
         // Clean up the URL
         window.history.replaceState({}, document.title, window.location.pathname);
       } catch (error) {
@@ -66,13 +72,28 @@ function App() {
     }
 
     setClaiming(true);
-    
+
     try {
-      // Here you would call your faucet API
-      // For now, just simulate the process
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      alert(`Tokens sent to ${ethAddress}! Check your wallet in a few minutes.`);
-      setEthAddress('');
+      const response = await fetch('http://localhost:4000/auth/claim', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ethAddress: ethAddress.trim(),
+          userId: user?.id
+        }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        // Success - just clear the form and show in UI
+        setEthAddress('');
+        // You could add a success message here if needed
+      } else {
+        alert(`Error: ${result.message || 'Failed to claim tokens'}`);
+      }
     } catch (error) {
       console.error('Error claiming tokens:', error);
       alert('Error claiming tokens. Please try again.');
@@ -126,13 +147,19 @@ function App() {
                   disabled={claiming}
                 />
               </div>
-              <button 
+              <button
                 className="get-tokens-button"
                 onClick={handleGetTokens}
                 disabled={claiming || !ethAddress.trim()}
               >
                 {claiming ? 'Sending Tokens...' : 'Get Tokens'}
               </button>
+
+              {user?.last_claimed && (
+                <div className="claim-info">
+                  <p>Last claimed: {new Date(user.last_claimed).toLocaleString()}</p>
+                </div>
+              )}
             </div>
           </div>
         )}

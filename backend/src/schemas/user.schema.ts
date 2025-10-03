@@ -3,7 +3,7 @@ import { Document } from 'mongoose';
 
 export type UserDocument = User & Document;
 
-@Schema({ timestamps: true })
+@Schema({ timestamps: { createdAt: true, updatedAt: false } })
 export class User {
   @Prop({ required: true, unique: true })
   githubId: number;
@@ -16,6 +16,12 @@ export class User {
 
   @Prop()
   avatar_url: string;
+
+  @Prop()
+  eth_address: string;
+
+  @Prop({ type: Date })
+  last_claimed: Date;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
